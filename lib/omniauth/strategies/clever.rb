@@ -42,25 +42,45 @@ module OmniAuth
         end
       end
 
-      uid{ raw_info['data']['id'] }
+      uid do
+        me["data"]["id"]
+      end
 
       info do
-        { :user_type => raw_info['type'] }.merge! raw_info['data']
+        {
+          email: detail.dig("data", "email"),
+          name: detail.dig("data", "name").to_h.values_at("first", "last").compact.join(" "),
+          first_name: detail.dig("data", "name", "first"),
+          last_name: detail.dig("data", "name", "last"),
+        }
       end
 
       extra do
         {
-          'raw_info' => raw_info
+          raw_info: {
+            me: me,
+            detail: detail,
+          }
         }
       end
 
-      def raw_info
-        @raw_info ||= access_token.get('/me').parsed
+      def me
+        @me ||= access_token.get('/v2.0/me').parsed
       end
 
       # Fix unknown redirect uri bug by NOT appending the query string to the callback url.
       def callback_url
         full_host + script_name + callback_path
+      end
+
+      private
+
+      def detail
+        @detail ||= access_token.get(detail_uri).parsed
+      end
+
+      def detail_uri
+        me.fetch("links").find{ |link| link["rel"] == "canonical" }.fetch("uri")
       end
     end
   end
